@@ -27,8 +27,8 @@ enum CredentialManagerError {
     InvalidLengthValue,
     #[error("Failed to read password")]
     PasswordReadError,
-    #[error("Passwords do not match")]
-    PasswordMismatch,
+    // #[error("Passwords do not match")]
+    // PasswordMismatch,
     #[error("Failed to read credentials file")]
     CredentialFileReadError,
     #[error("Failed to parse JSON")]
@@ -109,14 +109,14 @@ fn build_cli() -> Command {
                 .arg(Arg::new("password").required(false).help("Password"))
                 .arg(
                     Arg::new("generate-password")
-                        .short('g')
+                        .short('p')
                         .long("generate-password")
                         .help("Generate a strong random password")
                         .action(ArgAction::SetTrue),
                 )
                 .arg(
                     Arg::new("generate-passphrase")
-                        .short('p')
+                        .short('w')
                         .long("generate-passphrase")
                         .help("Generate a passphrase as the password")
                         .action(ArgAction::SetTrue),
@@ -199,65 +199,6 @@ fn build_cli() -> Command {
                 .arg(Arg::new("service").required(true).help("Service name")),
         )
         .subcommand(Command::new("list").about("List all stored credentials"))
-        .subcommand(
-            Command::new("generate-password")
-                .about("Generate a strong random password with customizable policies")
-                .arg(
-                    Arg::new("length")
-                        .short('l')
-                        .long("length")
-                        .value_name("LENGTH")
-                        .help("Length of the generated password")
-                        .default_value("16"),
-                )
-                .arg(
-                    Arg::new("include-symbols")
-                        .short('s')
-                        .long("include-symbols")
-                        .help("Include symbols in the generated password")
-                        .action(ArgAction::SetTrue),
-                )
-                .arg(
-                    Arg::new("exclude-ambiguous")
-                        .short('a')
-                        .long("exclude-ambiguous")
-                        .help("Exclude ambiguous characters (e.g., O, 0, I, l)")
-                        .action(ArgAction::SetTrue),
-                )
-                .arg(
-                    Arg::new("include-uppercase")
-                        .short('u')
-                        .long("include-uppercase")
-                        .help("Include uppercase letters in the generated password")
-                        .action(ArgAction::SetTrue),
-                )
-                .arg(
-                    Arg::new("include-lowercase")
-                        .short('o')
-                        .long("include-lowercase")
-                        .help("Include lowercase letters in the generated password")
-                        .action(ArgAction::SetTrue),
-                )
-                .arg(
-                    Arg::new("include-numbers")
-                        .short('n')
-                        .long("include-numbers")
-                        .help("Include numbers in the generated password")
-                        .action(ArgAction::SetTrue),
-                ),
-        )
-        .subcommand(
-            Command::new("generate-passphrase")
-                .about("Generate a memorable passphrase using random words")
-                .arg(
-                    Arg::new("words")
-                        .short('w')
-                        .long("words")
-                        .value_name("NUMBER_OF_WORDS")
-                        .help("Number of words in the passphrase")
-                        .default_value("4"),
-                ),
-        )
 }
 
 fn handle_add_command(sub_m: &clap::ArgMatches) -> Result<(), CredentialManagerError> {
@@ -265,6 +206,10 @@ fn handle_add_command(sub_m: &clap::ArgMatches) -> Result<(), CredentialManagerE
     let username = sub_m.get_one::<String>("username").unwrap();
 
     let password = get_password(sub_m)?;
+    
+    // Display the generated password or passphrase
+    println!("Generated password/passphrase: {}", password);
+
     validate_password_strength(&password)?;
 
     let master_password = get_master_password(false)?;
@@ -276,6 +221,10 @@ fn handle_add_command(sub_m: &clap::ArgMatches) -> Result<(), CredentialManagerE
         .unwrap_or(1);
 
     add_credential(service, username, &password, encryption_level, &master_password)?;
+
+    // Drop the master password from memory as soon as it's no longer needed
+    drop(master_password);
+
     Ok(())
 }
 
@@ -495,21 +444,28 @@ fn get_config_path() -> Result<PathBuf, CredentialManagerError> {
 
 fn get_master_password(confirm: bool) -> Result<SecretString, CredentialManagerError> {
     loop {
-        let password = prompt_password("Enter master password: ").map_err(|_| CredentialManagerError::PasswordReadError)?;
+        let password = SecretString::new(
+            prompt_password("Enter master password: ")
+                .map_err(|_| CredentialManagerError::PasswordReadError)?
+                .into_boxed_str()
+        );
 
         if confirm {
-            let password_confirm = prompt_password("Confirm master password: ").map_err(|_| CredentialManagerError::PasswordReadError)?;
+            let password_confirm = SecretString::new(
+                prompt_password("Confirm master password: ")
+                    .map_err(|_| CredentialManagerError::PasswordReadError)?
+                    .into_boxed_str()
+            );
 
-            if password != password_confirm {
+            if password.expose_secret() != password_confirm.expose_secret() {
                 println!("{}", "Passwords do not match. Please try again.".red());
-                return Err(CredentialManagerError::PasswordMismatch); // Use the error variant
+                continue;
             }
         }
 
-        return Ok(SecretString::from(password));
+        return Ok(password);
     }
 }
-
 
 fn derive_key(password: &SecretString, salt: &SaltString) -> [u8; 32] {
     let argon2 = Argon2::default();
@@ -523,7 +479,7 @@ fn derive_key(password: &SecretString, salt: &SaltString) -> [u8; 32] {
 
 fn encrypt_data(key: &[u8; 32], plaintext: &[u8], encryption_level: u8) -> (Vec<u8>, [u8; 12]) {
     let mut nonce = [0u8; 12]; // 96 bits
-    OsRng.fill_bytes(&mut nonce);
+    OsRng.fill_bytes(&mut nonce); // Securely generate a random nonce
 
     let ciphertext = match encryption_level {
         1 => {
