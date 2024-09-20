@@ -24,7 +24,7 @@ cargo install smeagol_seal
 Alternatively, you can clone the repository and build it manually:
 
 ```
-git clone https://github.com/yourusername/smeagol_seal.git
+git clone https://github.com/borisshmul/smeagol_seal.git
 cd smeagol_seal
 cargo build --release
 ```
