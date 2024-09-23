@@ -73,3 +73,17 @@ cargo build --release
 
 - `-w`, `--words <NUMBER_OF_WORDS>`: Number of words in the passphrase (default: 4).
 
+## Security Considerations
+
+### 1. Storing Regular Passwords
+- **Where Stored**: Regular passwords are stored in a JSON file (`credentials.json`) after being encrypted. The actual password is stored in a secure format, encrypted with a key derived from the master password.
+- **Encryption**: Strong encryption algorithms (AES-256-GCM or ChaCha20-Poly1305) are used to encrypt the passwords, ensuring they are protected as long as the encryption key is secure.
+
+### 2. Storing the Master Password
+- **How It's Handled**: The master password is never stored directly. Instead, it is used to derive an encryption key through the Argon2 algorithm, which is used to encrypt and decrypt stored credentials.
+- **Key Derivation**: The master password is securely handled using the `SecretString` type from the `secrecy` crate, minimizing exposure of sensitive data.
+
+### 3. Security Measures in Place
+- **Access Control**: File permissions (e.g., `0600`) restrict access to the credential file, ensuring that only the owner can read or write it.
+- **Zeroing Out Sensitive Data**: Sensitive data (like the master password) is dropped as soon as it's no longer needed, protecting against memory leaks.
+- **Error Handling**: The application incorporates error handling to prevent crashes when decryption fails.
