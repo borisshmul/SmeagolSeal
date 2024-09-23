@@ -30,4 +30,6 @@ pub enum CredentialManagerError {
     CredentialFilePermissionError,
     #[error("Invalid master password")]
     InvalidPassword,
+    #[error("Decryption failed")]
+    DecryptionFailed,
 }

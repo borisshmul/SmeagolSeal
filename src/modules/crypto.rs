@@ -89,23 +89,22 @@ fn decrypt_data(
     ciphertext: &[u8],
     nonce: &[u8; 12],
     encryption_level: u8,
-) -> Vec<u8> {
+) -> Result<Vec<u8>, CredentialManagerError> {
     // Choose the decryption algorithm based on the specified level
-    match encryption_level {
+    let decrypted_data = match encryption_level {
         1 => {
             let cipher = Aes256Gcm::new(key.expose_secret().into()); // AES-256-GCM decryption
-            cipher
-                .decrypt(&Nonce::from_slice(nonce), ciphertext)
-                .expect("Decryption failed")
+            cipher.decrypt(&Nonce::from_slice(nonce), ciphertext)
         }
         2 => {
             let cipher = ChaCha20Poly1305::new(key.expose_secret().into()); // ChaCha20-Poly1305 decryption
-            cipher
-                .decrypt(&Nonce::from_slice(nonce), ciphertext)
-                .expect("Decryption failed")
+            cipher.decrypt(&Nonce::from_slice(nonce), ciphertext)
         }
-        _ => panic!("Invalid encryption level"), // Panic if an invalid encryption level is provided
-    }
+        _ => return Err(CredentialManagerError::InvalidEncryptionLevel), // Handle invalid encryption level
+    };
+
+    // Return the decrypted data or an error if decryption failed
+    decrypted_data.map_err(|_| CredentialManagerError::DecryptionFailed)
 }
 
 // Loads credentials from the stored configuration file
@@ -140,8 +139,8 @@ pub fn load_credentials(
         // Derive the key using the master password and the extracted salt
         let key = derive_key(master_password, &salt);
 
-        // Decrypt the stored credentials
-        let decrypted_data = decrypt_data(&key, &ciphertext, &nonce, encryption_level);
+        // Attempt to decrypt the stored credentials
+        let decrypted_data = decrypt_data(&key, &ciphertext, &nonce, encryption_level)?;
 
         // Deserialize the decrypted data into a HashMap of credentials
         let credentials: HashMap<String, Credential> =
@@ -159,6 +158,7 @@ pub fn load_credentials(
         ))
     }
 }
+
 
 // Saves credentials to the configuration file securely
 pub fn save_credentials(
