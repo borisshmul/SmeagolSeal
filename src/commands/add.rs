@@ -1,16 +1,21 @@
 use clap::ArgMatches;
-use crate::{crypto, errors::CredentialManagerError, utils::*};
+use secrecy::{ExposeSecret, SecretString}; // Import the necessary types from secrecy
+use crate::modules::{crypto, errors::CredentialManagerError, utils::*};
 
 pub fn handle_add_command(sub_m: &ArgMatches) -> Result<(), CredentialManagerError> {
     let service = sub_m.get_one::<String>("service").unwrap();
     let username = sub_m.get_one::<String>("username").unwrap();
 
-    let password = get_password(sub_m)?;
-    
-    println!("Generated password/passphrase: {}", password);
+    // Convert the String to Box<str> and then create a SecretString
+    let password = SecretString::new(get_password(sub_m)?.into());
 
-    validate_password_strength(&password)?;
+    // Securely print the generated password/passphrase (if necessary)
+    println!("Generated password/passphrase: {}", password.expose_secret());
 
+    // Validate the password strength (this method needs a &str, so we expose it)
+    validate_password_strength(password.expose_secret())?;
+
+    // Get the master password securely and convert it to SecretString
     let master_password = get_master_password(false)?;
 
     let encryption_level = sub_m
@@ -19,8 +24,11 @@ pub fn handle_add_command(sub_m: &ArgMatches) -> Result<(), CredentialManagerErr
         .parse::<u8>()
         .unwrap_or(1);
 
-    crypto::add_credential(service, username, &password, encryption_level, &master_password)?;
+    // Add the credential using the securely stored password and master password
+    crypto::add_credential(service, username, password.expose_secret(), encryption_level, &master_password)?;
 
+    // Explicitly drop sensitive data as soon as it is no longer needed
+    drop(password);
     drop(master_password);
 
     Ok(())

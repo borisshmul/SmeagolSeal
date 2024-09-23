@@ -1,11 +1,14 @@
-mod cli;
+mod modules {
+    pub mod crypto;
+    pub mod errors;
+    pub mod models;
+    pub mod utils;
+    pub mod cli;
+}
 mod commands;
-mod crypto;
-mod errors;
-mod models;
-mod utils;
 
-use errors::CredentialManagerError;
+use modules::errors::CredentialManagerError;
+use modules::cli; 
 
 fn main() -> Result<(), CredentialManagerError> {
     let matches = cli::build_cli().get_matches();

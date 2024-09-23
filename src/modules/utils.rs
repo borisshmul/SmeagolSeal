@@ -1,4 +1,3 @@
-use base64::{engine::general_purpose, Engine as _};
 use colored::Colorize;
 use dirs::config_dir;
 use secrecy::{ExposeSecret, SecretString};
@@ -8,7 +7,7 @@ use std::path::PathBuf;
 use clap::ArgMatches;
 use rand::Rng;
 use rpassword::prompt_password;
-use crate::errors::CredentialManagerError;
+use crate::modules::errors::CredentialManagerError;
 
 pub fn validate_password_strength(password: &str) -> Result<(), CredentialManagerError> {
     loop {

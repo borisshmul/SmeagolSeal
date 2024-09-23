@@ -1,10 +1,11 @@
+use crate::modules::utils;
 use clap::ArgMatches;
-use crate::{crypto, errors::CredentialManagerError};
+use crate::modules::{crypto, errors::CredentialManagerError};
 use colored::Colorize;
 
 pub fn handle_delete_command(sub_m: &ArgMatches) -> Result<(), CredentialManagerError> {
     let service = sub_m.get_one::<String>("service").unwrap();
-    let master_password = crate::utils::get_master_password(false)?;
+    let master_password = utils::get_master_password(false)?;
     let (mut credentials, encryption_level, salt, _) = crypto::load_credentials(&master_password)?;
 
     if credentials.remove(service).is_some() {
