@@ -1,4 +1,5 @@
 use colored::Colorize;
+use constant_time_eq::constant_time_eq;
 use dirs::config_dir;
 use secrecy::{ExposeSecret, SecretString};
 use std::fs;
@@ -7,7 +8,12 @@ use std::path::PathBuf;
 use clap::ArgMatches;
 use rand::Rng;
 use rpassword::prompt_password;
+
 use crate::modules::errors::CredentialManagerError;
+
+pub fn check_master_password(stored_password: &SecretString, provided_password: &str) -> bool {
+    constant_time_eq(stored_password.expose_secret().as_bytes(), provided_password.as_bytes())
+}
 
 pub fn validate_password_strength(password: &str) -> Result<(), CredentialManagerError> {
     loop {

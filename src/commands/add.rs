@@ -1,6 +1,7 @@
 use clap::ArgMatches;
-use secrecy::{ExposeSecret, SecretString}; // Import the necessary types from secrecy
+use secrecy::{ExposeSecret, SecretString};
 use crate::modules::{crypto, errors::CredentialManagerError, utils::*};
+use crate::modules::utils;
 
 pub fn handle_add_command(sub_m: &ArgMatches) -> Result<(), CredentialManagerError> {
     let service = sub_m.get_one::<String>("service").unwrap();
@@ -18,6 +19,12 @@ pub fn handle_add_command(sub_m: &ArgMatches) -> Result<(), CredentialManagerErr
     // Get the master password securely and convert it to SecretString
     let master_password = get_master_password(false)?;
 
+    // Example usage of constant-time comparison:
+    let stored_password = utils::get_master_password(false)?; // Load stored master password from secure storage
+    if !utils::check_master_password(&stored_password, master_password.expose_secret()) {
+        return Err(CredentialManagerError::InvalidPassword); // Replace with appropriate error handling
+    }
+
     let encryption_level = sub_m
         .get_one::<String>("encryption")
         .unwrap_or(&"1".to_string())
@@ -30,6 +37,7 @@ pub fn handle_add_command(sub_m: &ArgMatches) -> Result<(), CredentialManagerErr
     // Explicitly drop sensitive data as soon as it is no longer needed
     drop(password);
     drop(master_password);
+    drop(stored_password);
 
     Ok(())
 }

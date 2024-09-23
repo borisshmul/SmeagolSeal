@@ -28,4 +28,6 @@ pub enum CredentialManagerError {
     ConfigDirPermissionError,
     #[error("Failed to set permissions on credentials file")]
     CredentialFilePermissionError,
+    #[error("Invalid master password")]
+    InvalidPassword,
 }
